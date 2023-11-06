@@ -24,7 +24,54 @@ import torch
 from torch import nn
 import torchvision.transforms as tvtransforms
 
+# For Pyramid Net
+class IdentityPadding(nn.Module):
+    def __init__(self, in_channels, out_channels, stride=1):
+        super(IdentityPadding, self).__init__()
 
+        if stride == 2:
+            self.pooling = nn.AvgPool2d(kernel_size=2, stride=2, ceil_mode=True)
+        else:
+            self.pooling = None
+            
+        self.add_channels = out_channels - in_channels
+    
+    def forward(self, x):
+        out = F.pad(x, (0, 0, 0, 0, 0, self.add_channels))
+        if self.pooling is not None:
+            out = self.pooling(out)
+        return out
+
+
+class ResidualBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, stride=1):
+        super(ResidualBlock, self).__init__()
+        self.bn1 = nn.BatchNorm2d(in_channels)
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, 
+                                stride=stride, padding=1, bias=False)      
+        self.bn2 = nn.BatchNorm2d(out_channels)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, 
+                                stride=1, padding=1, bias=False)    
+        self.bn3 = nn.BatchNorm2d(out_channels)
+        self.relu = nn.ReLU(inplace=True)
+
+        self.down_sample = IdentityPadding(in_channels, out_channels, stride)
+            
+        self.stride = stride
+
+    def forward(self, x):
+        shortcut = self.down_sample(x)
+        out = self.bn1(x)
+        out = self.conv1(out)        
+        out = self.bn2(out)
+        out = self.relu(out)
+        out = self.conv2(out)
+        out = self.bn3(out)
+       
+        out += shortcut
+        return out
+
+# Original code
 class GhostModule(nn.Module):
     def __init__(self, inp, oup, kernel_size=1, ratio=2, dw_size=3, stride=1, padding=0, relu=True, norm='batch'):
         super(GhostModule, self).__init__()
