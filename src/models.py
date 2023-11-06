@@ -28,6 +28,68 @@ from ghostnet import ghostnet as load_ghostnet
 from models_utils import *
 
 
+# Pyramid Net from "Deep Pyramidal Residual Networks"
+class PyramidNet(nn.Module):
+    def __init__(self, num_layers, alpha, block, num_classes=10):
+        super(PyramidNet, self).__init__()   	
+        self.in_channels = 16
+        
+        # num_layers = (110 - 2)/6 = 18
+        self.num_layers = num_layers
+        self.addrate = alpha / (3*self.num_layers*1.0)
+
+        self.conv1 = nn.Conv2d(in_channels=3, out_channels=16, kernel_size=3, 
+                               stride=1, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(16)
+
+        # feature map size = 32x32
+        self.layer1 = self.get_layers(block, stride=1)
+        # feature map size = 16x16
+        self.layer2 = self.get_layers(block, stride=2)
+        # feature map size = 8x8
+        self.layer3 = self.get_layers(block, stride=2)
+
+        self.out_channels = int(round(self.out_channels))
+        self.bn_out= nn.BatchNorm2d(self.out_channels)
+        self.relu_out = nn.ReLU(inplace=True)
+        self.avgpool = nn.AvgPool2d(8, stride=1)
+        self.fc_out = nn.Linear(self.out_channels, num_classes)
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', 
+                                        nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+    def get_layers(self, block, stride):
+        layers_list = []
+        for _ in range(self.num_layers - 1):
+            self.out_channels = self.in_channels + self.addrate
+            layers_list.append(block(int(round(self.in_channels)), 
+                                     int(round(self.out_channels)), 
+                                     stride))
+            self.in_channels = self.out_channels
+            stride=1
+
+        return nn.Sequential(*layers_list)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+
+        x = self.bn_out(x)
+        x = self.relu_out(x)
+        x = self.avgpool(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc_out(x)
+        return x
+
 # From "Communication-Efficient Learning of Deep Networks from Decentralized Data"
 class mlp_mnist(nn.Module):
     def __init__(self, num_classes, num_channels, model_args):
