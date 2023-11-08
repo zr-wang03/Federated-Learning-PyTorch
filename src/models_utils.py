@@ -23,6 +23,7 @@ from math import ceil
 import torch
 from torch import nn
 import torchvision.transforms as tvtransforms
+import torch.nn.functional as F
 
 # For Pyramid Net
 class IdentityPadding(nn.Module):

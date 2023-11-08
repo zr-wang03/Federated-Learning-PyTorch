@@ -51,6 +51,8 @@ class Subset(torch.utils.data.Dataset):
     def __getitem__(self, idx, augmented=True, normalized=True):
         example, target = self.dataset[self.idxs[idx]]
         example = tvtransforms.ToTensor()(example)
+        # print(type(target))
+        # target = torch.Tensor.float(target)
         if augmented and self.augment is not None:
             example = self.augment(example)
         if normalized and self.normalize is not None:

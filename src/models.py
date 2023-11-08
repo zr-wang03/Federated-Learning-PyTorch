@@ -29,6 +29,11 @@ from models_utils import *
 
 
 # Pyramid Net from "Deep Pyramidal Residual Networks"
+def pyramidnet(alpha = 48, num_layers = 18):
+	block = ResidualBlock
+	model = PyramidNet(num_layers=num_layers, alpha=alpha, block=block)
+	return model
+
 class PyramidNet(nn.Module):
     def __init__(self, num_layers, alpha, block, num_classes=10):
         super(PyramidNet, self).__init__()   	

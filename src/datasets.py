@@ -28,11 +28,11 @@ def cifar10(args, dataset_args):
         train_augment, test_augment = None, None
     else:
         train_augment = tvtransforms.Compose([
-            tvtransforms.RandomCrop(24),
+            tvtransforms.RandomCrop(32, padding=4),
             tvtransforms.RandomHorizontalFlip(),
             tvtransforms.ColorJitter(brightness=(0.5,1.5), contrast=(0.5,1.5)),
         ])
-        test_augment = tvtransforms.CenterCrop(24)
+        test_augment = tvtransforms.CenterCrop(32)
 
     return get_datasets(name='CIFAR10', train_augment=train_augment, test_augment=test_augment, args=args)
 

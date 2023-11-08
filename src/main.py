@@ -31,11 +31,15 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 import datasets, models, optimizers, schedulers
+from models import pyramidnet
 from options import args_parser
 from utils import average_updates, exp_details, get_acc_avg, printlog_stats
 from datasets_utils import Subset, get_datasets_fig
 from sampling import get_splits, get_splits_fig
 from client import Client
+
+import torch.optim as optim
+from torch.optim import lr_scheduler
 
 
 if __name__ == '__main__':
@@ -95,13 +99,22 @@ if __name__ == '__main__':
     # Load model
     num_classes = len(datasets_actual['train'].classes)
     num_channels = datasets_actual['train'][0][0].shape[0]
-    model = getattr(models, args.model)(num_classes, num_channels, args.model_args).to(args.device)
+    if (args.model == "PyramidNet"):
+        model = pyramidnet().to(args.device)
+        optim = optim.SGD(model.parameters(), lr=0.1, 
+                      momentum=0.9, weight_decay=1e-4)
+        decay_epochs = [150, 225]
+        sched = lr_scheduler.MultiStepLR(optim, decay_epochs, gamma=0.1)
+    else:
+        model = getattr(models, args.model)(num_classes, num_channels, args.model_args).to(args.device)
+        # Load optimizer and scheduler
+        optim = getattr(optimizers, args.optim)(model.parameters(), args.optim_args)
+        sched = getattr(schedulers, args.sched)(optim, args.sched_args)
+
     if args.resume:
         model.load_state_dict(checkpoint['model_state_dict'])
 
-    # Load optimizer and scheduler
-    optim = getattr(optimizers, args.optim)(model.parameters(), args.optim_args)
-    sched = getattr(schedulers, args.sched)(optim, args.sched_args)
+    
     if args.resume:
         optim.load_state_dict(checkpoint['optim_state_dict'])
         sched.load_state_dict(checkpoint['sched_state_dict'])
@@ -217,7 +230,18 @@ if __name__ == '__main__':
             #    new_weights[key] = new_weights[key] - v[key] * args.server_lr
             #model.load_state_dict(new_weights)
             for key in model.state_dict():
-                model.state_dict()[key] -= v[key] * args.server_lr
+                # print("________________")
+                # print(type(key))
+                # print(key)
+                # print(type(model.state_dict()[key]))
+                # print(model.state_dict()[key])
+                # print(type(v[key]))
+                # print(v[key])
+                # print(type(args.server_lr))
+                if key.endswith("num_batches_tracked"):
+                    model.state_dict()[key] -= int(v[key]) * args.server_lr
+                else:
+                    model.state_dict()[key] -= v[key] * args.server_lr
 
             # Compute round average loss and accuracies
             if round % args.server_stats_every == 0:
